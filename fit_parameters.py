@@ -1,30 +1,28 @@
-"""Fit theta, M, X for the curve in xy_data.csv. See README.md for approach."""
+"""Recover theta, M, X for the curve in xy_data.csv.  please see README.md for approach."""
 
 import argparse
 import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution, least_squares
 
-# ---- Fixed problem constants --------------------
-Y_OFFSET = 42.0          # the "+42" term in y(t)
-OMEGA = 0.3              # the "0.3t" term inside sin(0.3t)
+Y_BASE = 42.0
+FREQ = 0.3
 
-# ---- Parameter bounds ----------------------------
-THETA_BOUNDS_DEG = (0.0, 50.0)
-M_BOUNDS = (-0.05, 0.05)
-X_BOUNDS = (0.0, 100.0)
-T_BOUNDS = (6.0, 60.0)   
+THETA_RANGE_DEG = (0.0, 50.0)
+M_RANGE = (-0.05, 0.05)
+X_RANGE = (0.0, 100.0)
+
 
 def residuals(params, x, y):
     """Per-point residual for candidate (theta_rad, M, X)."""
     theta, M, X = params
     xt = x - X
-    yt = y - Y_OFFSET
+    yt = y - Y_BASE
 
     t = xt * np.cos(theta) + yt * np.sin(theta)
     v = -xt * np.sin(theta) + yt * np.cos(theta)
 
-    predicted_v = np.exp(M * np.abs(t)) * np.sin(OMEGA * t)
+    predicted_v = np.exp(M * np.abs(t)) * np.sin(FREQ * t)
     return v - predicted_v
 
 
@@ -34,12 +32,12 @@ def sse(params, x, y):
     return float(np.sum(r ** 2))
 
 
-def fit(x, y, seed=42):
+def estimate_parameters(x, y, seed=42):
     """Run global search (Differential Evolution) then local least squares."""
     bounds = [
-        (np.deg2rad(THETA_BOUNDS_DEG[0]), np.deg2rad(THETA_BOUNDS_DEG[1])),
-        M_BOUNDS,
-        X_BOUNDS,
+        (np.deg2rad(THETA_RANGE_DEG[0]), np.deg2rad(THETA_RANGE_DEG[1])),
+        M_RANGE,
+        X_RANGE,
     ]
 
     de_result = differential_evolution(
@@ -74,7 +72,7 @@ def main():
     x, y = df["x"].values, df["y"].values
     print(f"Loaded {len(x)} points from {args.csv}")
 
-    params = fit(x, y)
+    params = estimate_parameters(x, y)
     print("\n=== Fitted parameters ===")
     print(f"theta = {params['theta_deg']:.6f} deg  ({params['theta_rad']:.10f} rad)")
     print(f"M     = {params['M']:.6f}")
@@ -82,7 +80,6 @@ def main():
     print(f"sum of squared residuals = {params['sse']:.3e}")
     print(f"max abs residual         = {params['max_abs_residual']:.3e}")
 
-    
 
 
 if __name__ == "__main__":
